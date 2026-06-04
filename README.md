@@ -13,7 +13,9 @@ Part of a two-tool personal knowledge system:
 ## How it works
 
 ```
-You paste free text  →  regex extracts fields  →  saved to portfolio.json  →  export to CSV anytime
+data/*.json (skill config)  →  patterns compiled at runtime
+You paste free text         →  regex extracts fields + skill categories  →  saved to portfolio.json  →  export to CSV anytime
+
 ```
 
 **Input**
@@ -37,6 +39,7 @@ ho creato un tool chiamato Pulsar usando python e json,
 
 ## Features
 
+- **Data-driven skill extraction** - skill categories loaded from external JSON files, patterns compiled at runtime, no hardcoded lists
 - **Auto-extraction via regex** — name, technologies, date, status, link, platform
 - **Two entry types** — software projects and published content (LinkedIn, X)
 - **Persistent JSON storage** — entries accumulate across sessions
@@ -62,6 +65,25 @@ python pulsar.py
 4. Leggi report
 5. Esci
 ```
+
+## Skill categories
+
+PULSAR loads skill patterns from the `data/` folder at startup. Each file defines one category:
+
+```json
+{
+  "label": "techs",
+  "keywords": ["python", "sql", "bash", "git"]
+}
+```
+
+| File | Label | Purpose |
+|---|---|---|
+| `techs.json` | `techs` | languages and core tools |
+| `frameworks.json` | `frameworks` | libraries and frameworks |
+| `cloud_providers.json` | `cloud` | cloud platforms and services |
+
+To add a new technology, edit the relevant JSON file. To add a new category, drop a new `.json` file into `data/`. No code changes needed.
 
 ---
 
