@@ -5,6 +5,7 @@ import csv
 
 # ------- FILES DEFINITION -------
 
+data_dir = "data" #nuova riga
 csv_projects = "projects.csv"
 csv_skills = "skills.csv"
 json_name = "data.json"
@@ -39,6 +40,7 @@ def initialize_csvs():
 def main():
     initialize_json()
     initialize_csvs()
+    patterns = load_all_patterns(data_dir)
 
     while True:
         print("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
@@ -55,21 +57,27 @@ def main():
         if scelta == "1":
             print("\nDescrivi il software in testo libero.")
             print("Suggerimento: includi nome (chiamato X), tecnologie (python, json...),")
-            print("              stato (completato / in corso), link (https://...)")
+            print("stato (completato / in corso), link (https://...)")
             print("Esempio: ho creato un tool chiamato Signal usando python e json,")
-            print("         è completato, link https://github.com/user/signal\n")
+            print("è completato, link https://github.com/boccassinisergio-afk/Pulsar\n")
             string = input("→ ")
-            load_diz = extract_data(string)
-            save_portfolio(load_diz, "software")
+            dati_fissi = extract_data(string)
+            dati_pattern = extract(string, patterns)
+            dati_fissi["tecnologie"] = dati_pattern.get("techs", [])
+            #dati_fissi["frameworks"] = dati_pattern.get("frameworks", [])
+            #dati_fissi["cloud"] = dati_pattern.get("cloud_providers", []) #è necessario fare qualcosa per integrarli ulteriormente ?
+            save_portfolio(dati_fissi, "software")
         elif scelta == "2":
             print("\nDescrivi il contenuto pubblicato.")
             print("Suggerimento: includi titolo tra virgolette, piattaforma (social LinkedIn),")
-            print("              data, link")
+            print("data, link")
             print("Esempio: ho pubblicato \"Il mio primo tool Python\" su social linkedin,")
-            print("         link https://linkedin.com/post/123\n")
+            print("link https://linkedin.com/post/123\n")
             string = input("→ ")
-            load_diz = extract_data(string)
-            save_portfolio(load_diz, "contenuti")
+            dati_fissi = extract_data(string)
+            dati_pattern = extract(string, patterns)
+            dati_fissi["argomento"] = dati_pattern.get("techs", [])
+            save_portfolio(dati_fissi, "contenuti")
         elif scelta == "3":
             export_csv()
         elif scelta == "4":
@@ -83,7 +91,6 @@ def main():
 
 def extract_data(testo):
     data_to_export = {}
-    tecnologie = []
 
     string = testo.lower().strip()
 
@@ -112,11 +119,6 @@ def extract_data(testo):
             data_to_export.update({"titolo":titolo_fallback.group(1)})
     if titolo:
         data_to_export.update({"titolo":titolo.group(1)})
-    
-    tecnologia = re.findall(r"(python|csv|json|os|ml)", string)
-    if tecnologia:
-        tecnologie = tecnologia
-        data_to_export.update({"tecnologie":tecnologie})
 
     data = re.search(r"(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})|(\d{2}[\/\-]\d{4})|(\d{4}[\/\-]\d{2})", string)
     if not data:
@@ -169,7 +171,7 @@ def export_csv():
             writer = csv.DictWriter(csv_pj, fieldnames=FIELDNAMES, extrasaction='ignore')
 
             for entry in data['portfolio']['software']:
-                row = dict(entry)              
+                row = dict(entry)  #stai modificando dict in memoria, quindi ne crei una copia e modifichi la copia, visto che sei in modalità export    
                 row['sezione'] = 'software'   
                 row['tecnologie'] = ', '.join(row.get('tecnologie', [])) # → "python, json"
                 writer.writerow(row)
@@ -177,7 +179,7 @@ def export_csv():
             for entry in data['portfolio']['contenuti']:
                 row = dict(entry)
                 row['sezione'] = 'contenuti'
-                row['nome'] = row.pop('titolo', '')  # rinomina titolo → nome
+                row['nome'] = row.pop('titolo', '') 
                 writer.writerow(row)
 
         with open(csv_skills, "a", newline="") as csv_sk:
@@ -224,6 +226,53 @@ def read_report():
     print("\n━━━━━━━━━━━━━━━ CONTENUTI ━━━━━━━━━━━━━━━")
     for entry in data['portfolio']['contenuti']:
         print(f"Data: {entry.get('data','N/D')} | Titolo: {entry.get('titolo','N/D')} | Piattaforma: {entry.get('piattaforma','N/D')} | Link: {entry.get('link','N/D')}")
+
+# -------- DYNAMIC DICT SECTION -------------- NUOVA
+
+def load_all_patterns(data_dir):
+
+    if not os.path.exists(data_dir):
+        print(f"[WARN] cartella '{data_dir}' non trovata, nessun pattern caricato.")
+        return {}
+    
+    patterns = {}
+
+    for filename in os.listdir(data_dir):
+        if not filename.endswith(".json"):
+            continue
+
+        filepath = os.path.join(data_dir, filename)
+
+        try:
+            with open(filepath, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except (json.JSONDecodeError, KeyError) as e:
+            print(f"[WARN] {filename} ignorato: {e}")
+            continue
+
+        label = data["label"]
+        keywords = data["keywords"]
+
+        # Ordina per lunghezza decrescente: "google cloud" deve matchare
+        # prima che "google" consumi solo la prima parola
+        keywords_sorted = sorted(keywords, key=len, reverse=True)
+
+        pattern_str = r"\b(" + "|".join(re.escape(k) for k in keywords_sorted) + r")\b"
+        patterns[label] = re.compile(pattern_str, re.IGNORECASE)
+
+    return patterns
+
+def extract(text, patterns):
+    results = {}
+
+    for label, compiled_pattern in patterns.items():
+        matches = compiled_pattern.findall(text)
+        # findall con un gruppo () ritorna lista di stringhe catturate
+        # set() rimuove i duplicati, .lower() normalizza
+        results[label] = sorted(set(m.lower() for m in matches))
+
+    return results
+
 
 main()
 
