@@ -5,7 +5,7 @@ import csv
 
 # ------- FILES DEFINITION -------
 
-data_dir = "data" #nuova riga
+data_dir = "data"
 csv_projects = "projects.csv"
 csv_skills = "skills.csv"
 json_name = "data.json"
@@ -63,9 +63,11 @@ def main():
             string = input("→ ")
             dati_fissi = extract_data(string)
             dati_pattern = extract(string, patterns)
-            dati_fissi["tecnologie"] = dati_pattern.get("techs", [])
-            #dati_fissi["frameworks"] = dati_pattern.get("frameworks", [])
-            #dati_fissi["cloud"] = dati_pattern.get("cloud_providers", []) #è necessario fare qualcosa per integrarli ulteriormente ?
+            dati_fissi["tecnologie"] = [
+                tech
+                for categoria in dati_pattern.values()
+                for tech in categoria
+            ]
             save_portfolio(dati_fissi, "software")
         elif scelta == "2":
             print("\nDescrivi il contenuto pubblicato.")
@@ -171,9 +173,9 @@ def export_csv():
             writer = csv.DictWriter(csv_pj, fieldnames=FIELDNAMES, extrasaction='ignore')
 
             for entry in data['portfolio']['software']:
-                row = dict(entry)  #stai modificando dict in memoria, quindi ne crei una copia e modifichi la copia, visto che sei in modalità export    
+                row = dict(entry)
                 row['sezione'] = 'software'   
-                row['tecnologie'] = ', '.join(row.get('tecnologie', [])) # → "python, json"
+                row['tecnologie'] = ', '.join(row.get('tecnologie', []))
                 writer.writerow(row)
 
             for entry in data['portfolio']['contenuti']:
@@ -253,8 +255,6 @@ def load_all_patterns(data_dir):
         label = data["label"]
         keywords = data["keywords"]
 
-        # Ordina per lunghezza decrescente: "google cloud" deve matchare
-        # prima che "google" consumi solo la prima parola
         keywords_sorted = sorted(keywords, key=len, reverse=True)
 
         pattern_str = r"\b(" + "|".join(re.escape(k) for k in keywords_sorted) + r")\b"
@@ -267,8 +267,6 @@ def extract(text, patterns):
 
     for label, compiled_pattern in patterns.items():
         matches = compiled_pattern.findall(text)
-        # findall con un gruppo () ritorna lista di stringhe catturate
-        # set() rimuove i duplicati, .lower() normalizza
         results[label] = sorted(set(m.lower() for m in matches))
 
     return results
