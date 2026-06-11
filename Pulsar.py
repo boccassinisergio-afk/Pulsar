@@ -102,7 +102,9 @@ def extract_data(testo):
     
     piattaforma = re.search(r"(?:piattaforma|social)\s+(\w+)", string)
     if not piattaforma:
-        piattaforma = re.search(r"\bsu\s+(linkedin|twitter|x|instagram)\b", string)
+        piattaforma_fallback = re.search(r"\bsu\s+(linkedin|twitter|x|instagram)\b", string)
+        if piattaforma_fallback:
+            data_to_export.update({"piattaforma": piattaforma_fallback.group(1)})
     if piattaforma:
         data_to_export.update({"piattaforma": piattaforma.group(1)})
 
