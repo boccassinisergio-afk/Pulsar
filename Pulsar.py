@@ -3,6 +3,76 @@ import os
 import json
 import csv
 
+# ------- CLASS SECTION - NEW --------
+
+class Entry:
+    def __init__(self, data, link):
+        self.data = data
+        self.link = link
+
+    def to_dict(self):
+        return {"data": self.data,
+                "link": self.link
+                }
+
+
+class Software(Entry):
+    def __init__(self, data, tipo, nome, tecnologie, stato, link):
+        super().__init__(data, link)
+        self.tipo = tipo
+        self.nome = nome
+        self.tecnologie = tecnologie
+        self.stato = stato
+
+
+    def to_dict(self):
+        inherited_dict = super().to_dict()
+        inherited_dict['tipo'] = self.tipo 
+        inherited_dict['nome'] = self.nome
+        inherited_dict['tecnologie'] = self.tecnologie
+        inherited_dict['stato'] = self.stato
+        return inherited_dict 
+    
+    @classmethod
+    def from_dict(cls, incoming_dict):
+        return cls(data = incoming_dict.get('data', ""),
+                   tipo = incoming_dict.get('tipo', ""),
+                   nome = incoming_dict.get('nome', ""),
+                   tecnologie = incoming_dict.get('tecnologie', []),
+                   stato = incoming_dict.get('stato', ""),
+                   link = incoming_dict.get('link', "")
+                   )
+
+    def __str__(self):
+        return f"Data: {self.data} | Tipo: {self.tipo} | Nome: {self.nome} | Tecnologie: {', '.join(self.tecnologie)} | Stato: {self.stato} | Link: {self.link}"
+
+class Contenuto(Entry):
+    def __init__(self, data, titolo, argomento, piattaforma, link):
+        super().__init__(data, link)
+        self.titolo = titolo
+        self.argomento = argomento
+        self.piattaforma = piattaforma 
+
+    def to_dict(self):
+        inherited_dict = super().to_dict()
+        inherited_dict['titolo'] = self.titolo
+        inherited_dict['argomento'] = self.argomento
+        inherited_dict['piattaforma'] = self.piattaforma
+        return inherited_dict
+    
+    @classmethod
+    def from_dict(cls, incoming_dict):
+        return cls(
+            data = incoming_dict.get('data', ""),
+            titolo = incoming_dict.get('titolo', ""),
+            argomento = incoming_dict.get('argomento', []),
+            piattaforma = incoming_dict.get('piattaforma', ""),
+            link = incoming_dict.get('link', "")
+        )
+
+    def __str__(self):
+        return f"Data: {self.data} | Titolo: {self.titolo} | Argomento: {', '.join(self.argomento)} | Piattaforma: {self.piattaforma} | Link: {self.link}"
+    
 # ------- FILES DEFINITION -------
 
 data_dir = "data"
@@ -63,12 +133,16 @@ def main():
             string = input("→ ")
             dati_fissi = extract_data(string)
             dati_pattern = extract(string, patterns)
+
             dati_fissi["tecnologie"] = [
                 tech
                 for categoria in dati_pattern.values()
                 for tech in categoria
             ]
-            save_portfolio(dati_fissi, "software")
+            
+            temporary_entry = Software.from_dict(dati_fissi)
+            save_portfolio(temporary_entry, "software")
+
         elif scelta == "2":
             print("\nDescrivi il contenuto pubblicato.")
             print("Suggerimento: includi titolo tra virgolette, piattaforma (social LinkedIn),")
@@ -79,7 +153,9 @@ def main():
             dati_fissi = extract_data(string)
             dati_pattern = extract(string, patterns)
             dati_fissi["argomento"] = dati_pattern.get("techs", [])
-            save_portfolio(dati_fissi, "contenuti")
+            temporary_entry = Contenuto.from_dict(dati_fissi)
+            save_portfolio(temporary_entry, "contenuti")
+
         elif scelta == "3":
             export_csv()
         elif scelta == "4":
@@ -112,7 +188,7 @@ def extract_data(testo):
     if status:
         data_to_export.update({"stato":status.group(1)})
 
-    nome = re.search(r"(?:chiamato|si chiama|nome)\s+([a-zA-Z0-9_\- ]+)", string)
+    nome = re.search(r"(?:chiamato|si chiama|nome)\s+([a-zA-Z0-9_\-]+)", string)
     if nome:
         data_to_export.update({"nome":nome.group(1)})
     
@@ -138,100 +214,7 @@ def extract_data(testo):
 
     return data_to_export
 
-# ------- STORAGE ---------
-
-def save_portfolio(dati, sezione):
-    try:
-        with open(json_name, "r") as file_old:
-            existing_data = json.load(file_old)
-
-        existing_data["portfolio"][sezione].append(dati)
-
-        with open(json_name, "w") as file:
-            json.dump(existing_data, file, indent=4)
-
-        print(f"\n✓ Entry salvata in '{sezione}' correttamente.")
-
-    except FileNotFoundError:
-        print("Errore: file non trovato.")
-        return 
-    except json.JSONDecodeError:
-        print("Errore: file JSON corrotto.")
-        return
-    except PermissionError:
-        print("Errore: file in uso da un altro processo.")
-        return
-
-
-# -------- EXPORT ----------
-
-def export_csv():
-
-    skills = {}
-    try:
-        with open(json_name, "r") as existing_file:
-            data = json.load(existing_file)
-        with open(csv_projects, "a", newline="") as csv_pj:
-            writer = csv.DictWriter(csv_pj, fieldnames=FIELDNAMES, extrasaction='ignore')
-
-            for entry in data['portfolio']['software']:
-                row = dict(entry)
-                row['sezione'] = 'software'   
-                row['tecnologie'] = ', '.join(row.get('tecnologie', []))
-                writer.writerow(row)
-
-            for entry in data['portfolio']['contenuti']:
-                row = dict(entry)
-                row['sezione'] = 'contenuti'
-                row['nome'] = row.pop('titolo', '') 
-                writer.writerow(row)
-
-        with open(csv_skills, "a", newline="") as csv_sk:
-            writer = csv.DictWriter(csv_sk, fieldnames=SKILL_FIELDNAMES, extrasaction='ignore')
-
-            # ------ OCCORRENZE -------
-
-            for row in data['portfolio']['software']:
-                for tecnologia in row.get('tecnologie', []):
-                    skills[tecnologia] = skills.get(tecnologia, 0) + 1
-            for tecnologia, occorrenze in skills.items():
-                writer.writerow({"tecnologia": tecnologia, "occorrenze": occorrenze})
-
-    except FileNotFoundError:
-        print("Errore: file non trovato.")
-        return 
-    except json.JSONDecodeError:
-        print("Errore: file JSON corrotto.")
-        return 
-    except PermissionError:
-        print("Errore: file in uso da un altro processo.")
-        return
-    
-    print(f"\n✓ Esportazione completata:")
-    print(f"  → {csv_projects}")
-    print(f"  → {csv_skills}")
-
-# ----------- READ REPORT -------------
-
-def read_report():
-    try:
-        with open(json_name, "r") as file:
-            data = json.load(file)
-    except FileNotFoundError:
-        print("Errore: file non trovato.")
-        return
-    except json.JSONDecodeError:
-        print("Errore: file JSON corrotto.")
-        return
-    print("\n━━━━━━━━━━━━━━━ SOFTWARE ━━━━━━━━━━━━━━━")
-    for entry in data['portfolio']['software']:
-        tecnologie = ', '.join(entry.get('tecnologie', []))
-        print(f"Data: {entry.get('data','N/D')} | Nome: {entry.get('nome','N/D')} | Tecnologie: {tecnologie} | Link: {entry.get('link','N/D')}")
-    print("\n━━━━━━━━━━━━━━━ CONTENUTI ━━━━━━━━━━━━━━━")
-    for entry in data['portfolio']['contenuti']:
-        print(f"Data: {entry.get('data','N/D')} | Titolo: {entry.get('titolo','N/D')} | Piattaforma: {entry.get('piattaforma','N/D')} | Link: {entry.get('link','N/D')}")
-
-# -------- DYNAMIC DICT SECTION -------------- NUOVA
+# -------- DYNAMIC DICT SECTION --------------
 
 def load_all_patterns(data_dir):
 
@@ -272,6 +255,106 @@ def extract(text, patterns):
         results[label] = sorted(set(m.lower() for m in matches))
 
     return results
+
+# ------- STORAGE ---------
+
+def save_portfolio(dati, sezione):
+
+    temporary_entry = dati.to_dict()
+
+    try:
+        with open(json_name, "r") as file_old:
+            existing_data = json.load(file_old)
+
+        existing_data["portfolio"][sezione].append(temporary_entry)
+
+        with open(json_name, "w") as file:
+            json.dump(existing_data, file, indent=4)
+
+        print(f"\n✓ Entry salvata in '{sezione}' correttamente.")
+
+    except FileNotFoundError:
+        print("Errore: file non trovato.")
+        return 
+    except json.JSONDecodeError:
+        print("Errore: file JSON corrotto.")
+        return
+    except PermissionError:
+        print("Errore: file in uso da un altro processo.")
+        return
+
+
+# -------- EXPORT ----------
+
+def export_csv():
+
+    skills = {}
+    try:
+        with open(json_name, "r") as existing_file:
+            data = json.load(existing_file)
+        with open(csv_projects, "w", newline="") as csv_pj:
+            writer = csv.DictWriter(csv_pj, fieldnames=FIELDNAMES, extrasaction='ignore')
+            writer.writeheader()
+
+            for entry in data['portfolio']['software']:
+                row = dict(entry)
+                row['sezione'] = 'software'   
+                row['tecnologie'] = ', '.join(row.get('tecnologie', []))
+                writer.writerow(row)
+
+            for entry in data['portfolio']['contenuti']:
+                row = dict(entry)
+                row['sezione'] = 'contenuti'
+                row['nome'] = row.pop('titolo', '') 
+                row['argomento'] = ', '.join(row.get('argomento', []))
+                writer.writerow(row)
+
+        with open(csv_skills, "w", newline="") as csv_sk:
+            writer = csv.DictWriter(csv_sk, fieldnames=SKILL_FIELDNAMES, extrasaction='ignore')
+            writer.writeheader()
+
+            # ------ OCCORRENZE -------
+
+            for row in data['portfolio']['software']:
+                for tecnologia in row.get('tecnologie', []):
+                    skills[tecnologia] = skills.get(tecnologia, 0) + 1
+            for tecnologia, occorrenze in skills.items():
+                writer.writerow({"tecnologia": tecnologia, "occorrenze": occorrenze})
+
+    except FileNotFoundError:
+        print("Errore: file non trovato.")
+        return 
+    except json.JSONDecodeError:
+        print("Errore: file JSON corrotto.")
+        return 
+    except PermissionError:
+        print("Errore: file in uso da un altro processo.")
+        return
+    
+    print(f"\n✓ Esportazione completata:")
+    print(f"  → {csv_projects}")
+    print(f"  → {csv_skills}")
+
+# ----------- READ REPORT -------------
+
+def read_report():
+    try:
+        with open(json_name, "r") as file:
+            data = json.load(file)
+    except FileNotFoundError:
+        print("Errore: file non trovato.")
+        return
+    except json.JSONDecodeError:
+        print("Errore: file JSON corrotto.")
+        return
+    print("\n━━━━━━━━━━━━━━━ SOFTWARE ━━━━━━━━━━━━━━━")
+    for entry in data['portfolio']['software']:
+        dict_to_object = Software.from_dict(entry)
+        print(dict_to_object)
+    print("\n━━━━━━━━━━━━━━━ CONTENUTI ━━━━━━━━━━━━━━━")
+    for entry in data['portfolio']['contenuti']:
+        dict_to_object = Contenuto.from_dict(entry)
+        print(dict_to_object)
 
 
 main()
