@@ -3,21 +3,46 @@ import os
 import json
 import csv
 
-# ------- CLASS SECTION - NEW --------
-
 class Entry:
-    def __init__(self, data, link):
+
+    """Base class representing a portfolio entry with a date and a link.
+
+    Attributes:
+        data (str): The date associated with the entry.
+        link (str): The URL related to the entry.
+    """
+
+    def __init__(self, data: str, link: str) -> None:
         self.data = data
         self.link = link
 
-    def to_dict(self):
+    def to_dict(self) -> dict[str, str]:
+
+        """Serialize base entry fields to a dictionary.
+
+        Returns:
+            dict: A dictionary with 'data' and 'link' keys.
+        """
+
         return {"data": self.data,
                 "link": self.link
                 }
 
 
 class Software(Entry):
-    def __init__(self, data, tipo, nome, tecnologie, stato, link):
+
+    """Represents a software project entry in the PULSAR portfolio.
+
+    Inherits from Entry and adds project-specific metadata.
+
+    Attributes:
+        tipo (str): The project type (e.g. 'tool', 'progetto').
+        nome (str): The project name.
+        tecnologie (list[str]): Technologies used in the project.
+        stato (str): Current project status (e.g. 'completato', 'in corso').
+    """
+
+    def __init__(self, data: str, tipo: str, nome: str, tecnologie: list[str], stato: str, link: str) -> None:
         super().__init__(data, link)
         self.tipo = tipo
         self.nome = nome
@@ -25,7 +50,14 @@ class Software(Entry):
         self.stato = stato
 
 
-    def to_dict(self):
+    def to_dict(self) -> dict[str, str | list[str]]:
+
+        """Serialize the software entry to a dictionary, extending the base fields.
+
+        Returns:
+            dict: A dictionary with all Entry fields plus tipo, nome, tecnologie, and stato.
+        """
+
         inherited_dict = super().to_dict()
         inherited_dict['tipo'] = self.tipo 
         inherited_dict['nome'] = self.nome
@@ -34,7 +66,17 @@ class Software(Entry):
         return inherited_dict 
     
     @classmethod
-    def from_dict(cls, incoming_dict):
+    def from_dict(cls, incoming_dict: dict[str, str | list[str]]) -> "Software":
+
+        """Create a Software instance from a dictionary, using .get() for safe access.
+
+        Args:
+            incoming_dict (dict): A dictionary with software entry fields.
+
+        Returns:
+            Software: A new instance populated with dictionary data.
+        """
+
         return cls(data = incoming_dict.get('data', ""),
                    tipo = incoming_dict.get('tipo', ""),
                    nome = incoming_dict.get('nome', ""),
@@ -43,17 +85,38 @@ class Software(Entry):
                    link = incoming_dict.get('link', "")
                    )
 
-    def __str__(self):
+    def __str__(self) -> str:
+
+        """Return a formatted single-line string representation of the software entry."""
+
         return f"Data: {self.data} | Tipo: {self.tipo} | Nome: {self.nome} | Tecnologie: {', '.join(self.tecnologie)} | Stato: {self.stato} | Link: {self.link}"
 
 class Contenuto(Entry):
-    def __init__(self, data, titolo, argomento, piattaforma, link):
+
+    """Represents a published content entry in the PULSAR portfolio.
+
+    Inherits from Entry and adds content-specific metadata.
+
+    Attributes:
+        titolo (str): The content title.
+        argomento (list[str]): Topics or technologies covered.
+        piattaforma (str): The platform where the content was published (e.g. 'linkedin').
+    """
+
+    def __init__(self, data: str, titolo: str, argomento: list[str], piattaforma: str, link: str) -> None:
         super().__init__(data, link)
         self.titolo = titolo
         self.argomento = argomento
         self.piattaforma = piattaforma 
 
-    def to_dict(self):
+    def to_dict(self) -> dict[str, str | list[str]]:
+
+        """Serialize the content entry to a dictionary, extending the base fields.
+
+        Returns:
+            dict: A dictionary with all Entry fields plus titolo, argomento, and piattaforma.
+        """
+
         inherited_dict = super().to_dict()
         inherited_dict['titolo'] = self.titolo
         inherited_dict['argomento'] = self.argomento
@@ -61,7 +124,17 @@ class Contenuto(Entry):
         return inherited_dict
     
     @classmethod
-    def from_dict(cls, incoming_dict):
+    def from_dict(cls, incoming_dict: dict[str, str | list[str]]) -> "Contenuto":
+
+        """Create a Contenuto instance from a dictionary, using .get() for safe access.
+
+        Args:
+            incoming_dict (dict): A dictionary with content entry fields.
+
+        Returns:
+            Contenuto: A new instance populated with dictionary data.
+        """
+
         return cls(
             data = incoming_dict.get('data', ""),
             titolo = incoming_dict.get('titolo', ""),
@@ -70,7 +143,10 @@ class Contenuto(Entry):
             link = incoming_dict.get('link', "")
         )
 
-    def __str__(self):
+    def __str__(self) -> str:
+
+        """Return a formatted single-line string representation of the content entry."""
+
         return f"Data: {self.data} | Titolo: {self.titolo} | Argomento: {', '.join(self.argomento)} | Piattaforma: {self.piattaforma} | Link: {self.link}"
     
 # ------- FILES DEFINITION -------
@@ -84,7 +160,9 @@ SKILL_FIELDNAMES = ["tecnologia", "occorrenze"]
 
 # -------- FILES INITIALIZE -------
 
-def initialize_json():
+def initialize_json() -> None:
+
+    """Create the JSON portfolio file with default structure if it does not already exist."""
 
     default_data = {"portfolio": {
                     "software": [],
@@ -95,7 +173,10 @@ def initialize_json():
         with open(json_name, "w") as file:
             json.dump(default_data, file, indent=4)
 
-def initialize_csvs():
+def initialize_csvs() -> None:
+
+    """Create the projects and skills CSV files with headers if they do not already exist."""
+
     if not os.path.exists(csv_projects):
         with open(csv_projects, "w", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
@@ -105,9 +186,11 @@ def initialize_csvs():
             writer = csv.DictWriter(file, fieldnames=SKILL_FIELDNAMES)
             writer.writeheader()
 
-# ------- MAIN --------
 
-def main():
+def main() -> None:
+
+    """Run the Pulsar CLI loop: initialize storage, load patterns, and dispatch user actions."""
+
     initialize_json()
     initialize_csvs()
     patterns = load_all_patterns(data_dir)
@@ -167,7 +250,21 @@ def main():
 
 # ------    EXTRACTOR    ---------
 
-def extract_data(testo):
+def extract_data(testo: str) -> dict[str, str]:
+
+    """Extract structured fields from a free-text string using regex patterns.
+
+    Parses the input for known fields including link, platform, status, name,
+    title, date, and type. Falls back to secondary patterns when primary ones fail.
+
+    Args:
+        testo (str): The raw free-text input from the user.
+
+    Returns:
+        dict: A dictionary of extracted fields. Keys vary based on what was found
+        (e.g. 'link', 'stato', 'nome', 'titolo', 'data', 'tipo', 'piattaforma').
+    """
+
     data_to_export = {}
 
     string = testo.lower().strip()
@@ -216,7 +313,20 @@ def extract_data(testo):
 
 # -------- DYNAMIC DICT SECTION --------------
 
-def load_all_patterns(data_dir):
+def load_all_patterns(data_dir: str) -> dict[str, re.Pattern[str]]:
+
+    """Load and compile regex patterns from all JSON files in the given directory.
+
+    Each JSON file must contain a 'label' (str) and a 'keywords' (list[str]) field.
+    Keywords are sorted by length descending to prevent partial matches, then compiled
+    into a single case-insensitive pattern per category.
+
+    Args:
+        data_dir (str): Path to the directory containing keyword JSON files.
+
+    Returns:
+        dict: A dictionary mapping each label to its compiled re.Pattern.
+    """
 
     if not os.path.exists(data_dir):
         print(f"[WARN] cartella '{data_dir}' non trovata, nessun pattern caricato.")
@@ -247,7 +357,18 @@ def load_all_patterns(data_dir):
 
     return patterns
 
-def extract(text, patterns):
+def extract(text: str, patterns: dict[str, re.Pattern[str]]) -> dict[str, list[str]]:
+
+    """Apply compiled patterns to a text and return matched keywords by category.
+
+    Args:
+        text (str): The input text to search.
+        patterns (dict): Compiled patterns keyed by category label.
+
+    Returns:
+        dict: A dictionary mapping each label to a sorted list of unique lowercase matches.
+    """
+
     results = {}
 
     for label, compiled_pattern in patterns.items():
@@ -258,7 +379,14 @@ def extract(text, patterns):
 
 # ------- STORAGE ---------
 
-def save_portfolio(dati, sezione):
+def save_portfolio(dati: Entry, sezione: str) -> None:
+
+    """Append a portfolio entry to the appropriate section of the JSON file.
+
+    Args:
+        dati (Entry): A Software or Contenuto instance to save.
+        sezione (str): The portfolio section to append to ('software' or 'contenuti').
+    """
 
     temporary_entry = dati.to_dict()
 
@@ -286,7 +414,13 @@ def save_portfolio(dati, sezione):
 
 # -------- EXPORT ----------
 
-def export_csv():
+def export_csv() -> None:
+
+    """Export all portfolio entries to CSV files.
+
+    Writes software and content entries to projects.csv, and computes
+    technology occurrence counts for skills.csv.
+    """
 
     skills = {}
     try:
@@ -335,9 +469,10 @@ def export_csv():
     print(f"  → {csv_projects}")
     print(f"  → {csv_skills}")
 
-# ----------- READ REPORT -------------
+def read_report() -> None:
 
-def read_report():
+    """Read and print all portfolio entries from the JSON file, grouped by section."""
+
     try:
         with open(json_name, "r") as file:
             data = json.load(file)
@@ -357,7 +492,7 @@ def read_report():
         print(dict_to_object)
 
 
-main()
-
+if __name__ == "__main__":
+    main()
 
     
