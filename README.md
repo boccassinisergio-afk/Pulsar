@@ -1,5 +1,220 @@
 # Pulsar
 
+**🇮🇹 Italiano | [🇬🇧 English](#english)**
+
+> Synapse traccia ciò che impari. Pulsar traccia ciò che crei.
+
+![Pulsar demo](Pulsar-demo.gif)
+
+PULSAR è un tool CLI che estrae dati strutturati da descrizioni in testo libero dei tuoi progetti e contenuti pubblicati, senza input manuale campo per campo. Incolla una frase, ottieni un record strutturato.
+
+Parte di un sistema di conoscenza personale a due strumenti:
+- **[Synapse]** mappa concetti e progressi di apprendimento (connessioni interne)
+- **Pulsar** traccia software costruito e contenuti pubblicati (emissioni verso l'esterno)
+
+---
+
+## Come funziona
+
+```
+data/*.json (config delle skill)  →  pattern compilati a runtime
+Incolli testo libero               →  la regex estrae campi + categorie di skill
+                                    →  ogni record diventa un oggetto tipizzato (Software / Contenuto)
+                                    →  salvato in data.json  →  esportabile in CSV in qualsiasi momento
+```
+
+**Input**
+```
+ho creato un tool chiamato Pulsar usando python e json,
+è completato, link https://github.com/sergio/pulsar
+```
+
+**Estratto automaticamente**
+```json
+{
+  "nome": "Pulsar",
+  "tecnologie": ["python", "json"],
+  "stato": "completato",
+  "link": "https://github.com/sergio/pulsar",
+  "tipo": "tool"
+}
+```
+
+---
+
+## Architettura
+
+Ogni voce non è un dizionario slegato ma un oggetto tipizzato. Una piccola gerarchia di classi modella i due tipi di record, condividendo ciò che hanno in comune e differenziandosi dove serve:
+
+```
+Entry (base)        data, link                       · to_dict()
+├── Software        + tipo, nome, tecnologie, stato   · to_dict() · from_dict() · __str__()
+└── Contenuto       + titolo, argomento, piattaforma  · to_dict() · from_dict() · __str__()
+```
+
+- **Ereditarietà**: `Entry` contiene i campi comuni a ogni record (`data`, `link`); `Software` e `Contenuto` aggiungono i propri e riutilizzano il genitore tramite `super()`.
+- **Ponte oggetto/dizionario**: `to_dict()` trasforma un oggetto in un dizionario semplice per JSON e CSV; `from_dict()` (un classmethod) ricostruisce un oggetto da un dizionario salvato. Lo storage resta in JSON semplice, il programma lavora con oggetti reali.
+- **Polimorfismo**: il salvataggio (`save_portfolio`) e il report (`read_report`) chiamano `to_dict()` e `print(obj)` senza conoscere il tipo concreto. Ogni oggetto porta con sé il proprio comportamento, quindi la stessa riga funziona per entrambi i tipi di voce.
+
+---
+
+## Funzionalità
+
+- **Design orientato agli oggetti** - classi di voci tipizzate con ereditarietà e serializzazione polimorfica, non dizionari grezzi
+- **Estrazione di skill data-driven** - categorie di skill caricate da file JSON esterni, pattern compilati a runtime, nessuna lista hardcoded
+- **Auto-estrazione tramite regex** - nome, tecnologie, data, stato, link, piattaforma
+- **Due tipi di voce** - progetti software e contenuti pubblicati (LinkedIn, X)
+- **Storage JSON persistente** - le voci si accumulano tra le sessioni
+- **Esportazione CSV** - `projects.csv` (tutte le voci) + `skills.csv` (tecnologie aggregate per conteggio)
+- **Report da terminale** - riepilogo leggibile di tutte le voci salvate
+- **Gestione degli errori** - messaggi chiari per file mancanti o corrotti
+
+---
+
+## Utilizzo
+
+```bash
+python pulsar.py
+```
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          PULSAR
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. Aggiungi software
+2. Aggiungi contenuto
+3. Esporta CSV
+4. Leggi report
+5. Esci
+```
+
+## Categorie di skill
+
+Pulsar carica i pattern delle skill dalla cartella `data/` all'avvio. Ogni file definisce una categoria:
+
+```json
+{
+  "label": "techs",
+  "keywords": ["python", "sql", "bash", "git"]
+}
+```
+
+| File | Etichetta | Scopo |
+|---|---|---|
+| `techs.json` | `techs` | linguaggi e tool principali |
+| `frameworks.json` | `frameworks` | librerie e framework |
+| `cloud_providers.json` | `cloud` | piattaforme e servizi cloud |
+
+Per aggiungere una nuova tecnologia, modifica il file JSON relativo. Per aggiungere una nuova categoria, inserisci un nuovo file `.json` in `data/`. Nessuna modifica al codice necessaria.
+
+---
+
+## Guida all'input
+
+Pulsar legge il linguaggio naturale. Includi le parole chiave giuste e il tool estrae il resto.
+
+### Voce software
+
+| Campo | Pattern parola chiave | Esempio |
+|---|---|---|
+| Nome | `chiamato X` / `si chiama X` | `chiamato Pulsar` |
+| Tecnologie | menzionale direttamente | `python`, `json`, `csv` |
+| Stato | usa direttamente la parola | `completato` / `in corso` / `wip` |
+| Link | qualsiasi URL | `https://github.com/...` |
+| Tipo | usa direttamente la parola | `tool` / `progetto` |
+| Data | qualsiasi formato standard | `05/2025` / `maggio 2025` |
+
+Nota: il nome di un progetto viene letto come un singolo token (senza spazi), quindi `chiamato Pulsar` o `chiamato call-outcome-tracker` funzionano; i nomi multi-parola con spazi vengono troncati alla prima parola.
+
+**Esempio di input:**
+```
+ho creato un tool chiamato Pulsar usando python e json, è completato,
+link https://github.com/sergio/pulsar, maggio 2025
+```
+
+### Voce contenuto
+
+| Campo | Pattern parola chiave | Esempio |
+|---|---|---|
+| Titolo | racchiuso tra virgolette `"..."` | `"Il mio primo tool Python"` |
+| Argomento | tech/skill menzionate, rilevate automaticamente | `python`, `git` |
+| Piattaforma | `social X` / `su linkedin` | `su linkedin` |
+| Link | qualsiasi URL | `https://linkedin.com/...` |
+| Data | qualsiasi formato standard | `05/2025` |
+
+**Esempio di input:**
+```
+ho pubblicato "Il mio primo tool Python" su linkedin,
+link https://linkedin.com/post/123, maggio 2025
+```
+
+---
+
+## File di output
+
+### `data.json`
+```json
+{
+  "portfolio": {
+    "software": [
+      {
+        "data": "maggio 2025",
+        "tipo": "tool",
+        "nome": "Pulsar",
+        "tecnologie": ["python", "json"],
+        "stato": "completato",
+        "link": "https://github.com/sergio/pulsar"
+      }
+    ],
+    "contenuti": [
+      {
+        "data": "maggio 2025",
+        "titolo": "Il mio primo tool Python",
+        "argomento": ["python"],
+        "piattaforma": "linkedin",
+        "link": "https://linkedin.com/post/123"
+      }
+    ]
+  }
+}
+```
+
+### `projects.csv`
+| sezione | nome | tipo | piattaforma | tecnologie | argomento | stato | link | data |
+|---|---|---|---|---|---|---|---|---|
+| software | Pulsar | tool | | python, json | | completato | https://... | maggio 2025 |
+| contenuti | Il mio primo tool Python | | linkedin | | python | | https://... | maggio 2025 |
+
+### `skills.csv`
+| tecnologia | occorrenze |
+|---|---|
+| python | 3 |
+| json | 2 |
+
+---
+
+## Requisiti
+
+- Python 3.10+
+- Solo libreria standard (`re`, `os`, `json`, `csv`), nessuna installazione richiesta
+
+---
+
+## Parte di una roadmap più ampia
+
+Pulsar è stato costruito come progetto di apprendimento pratico durante il completamento di CS50P della Harvard University e la transizione verso lo sviluppo AI. Copre design orientato agli oggetti, regex, JSON, CSV, file I/O, design CLI e gestione degli errori, tutto dalla libreria standard di Python.
+
+<br><br>
+
+---
+---
+
+<a name="english"></a>
+
+# Pulsar
+
+**[🇮🇹 Italiano](#pulsar) | 🇬🇧 English**
+
 > Synapse tracks what you learn. Pulsar tracks what you create.
 
 ![Pulsar demo](Pulsar-demo.gif)
